@@ -1,13 +1,13 @@
 # Childhood lung function trajectories
 
-Modelling, validation and (in progress) phenotyping of FEV1 growth in a paediatric cohort.
+Modelling, validation and phenotyping of FEV1 growth in a paediatric cohort.
 
 ## Objective
 
 A short independent project to practise longitudinal modelling of lung function on public
 data, built while preparing my application for a PhD position at the University of Basel.
 It covers exploratory analysis, data quality checks, missing-data assessment,
-mixed-effects growth models and forward-prediction validation.
+mixed-effects growth models, forward-prediction validation and trajectory phenotyping.
 
 ## Key results
 
@@ -18,7 +18,12 @@ mixed-effects growth models and forward-prediction validation.
 - **Personalised predictions work:** predicting each girl's last visit from her earlier
   ones, the mixed model's error (0.186 L) was about 30% lower than carrying forward her
   previous value (0.266 L), and about half that of a population-only curve (0.355 L).
+- **No distinct phenotypes:** clustering girls by level and maturation speed gave a
+  reproducible split, but no more structure than a single continuous cloud (null
+  benchmark). Girls who start lower also grow more slowly and fall further behind.
 - **Results are robust** to excluding 17 flagged measurements.
+
+![Prediction error of three methods](figures/validation.png)
 
 ## Data
 
@@ -115,6 +120,12 @@ random slope) to make the intercept interpretable and help convergence.
   predictors and using a Powell → L-BFGS optimiser resolved it. Remaining "boundary"
   warnings were checked (both variances clearly > 0, correlation 0.17).
 
+![Measured FEV1, personal model curves and population curves for six girls](figures/individual_trajectories.png)
+
+*Dots: measured FEV1. Solid line: the girl's personal model curve. Dashed line: an
+average girl of the same height and age. The model follows each girl's level while
+ignoring isolated poor-effort tests (girl 246 at age 14.6).*
+
 ## 3. Validation (`notebooks/03_validation.ipynb`)
 
 Each girl's last visit was hidden (228 girls with ≥3 visits). The final model was
@@ -134,32 +145,59 @@ refitted on the remaining 1766 visits and used to predict the hidden ones.
   are available.
 - The age spline is defined for ages 6–19; predictions outside this range are not supported.
 
+## 4. Trajectory phenotyping (`notebooks/04_phenotypes.ipynb`)
+
+Each girl's random intercept (**level**) and random age slope (**maturation speed**)
+were taken from the final model fitted on all visits, and clustered with k-means.
+
+- Girls with 1–3 visits had speed estimates shrunk to ~0 (too little information), so
+  clustering used the 196 girls with ≥5 visits. Both variables were standardised.
+- k-means (k = 2–5) gave weak structure: silhouette 0.355–0.390, best at k = 2.
+- **Null benchmark:** clustering simulated single-cloud data with the same covariance
+  gave silhouette 0.362 on average (95th percentile 0.389). The real data (0.390) is no
+  better, so there is **no evidence of distinct trajectory phenotypes**; girls vary along
+  a continuum.
+- The k = 2 split is nonetheless reproducible (bootstrap ARI 0.94, 5th percentile 0.77)
+  and can be used descriptively: "higher and faster" (n = 113; level +0.06, speed +0.03)
+  vs "lower and slower" (n = 83; level −0.07, speed −0.04). Visit counts were similar.
+- Girls who start lower also mature more slowly, so their FEV1 falls further behind
+  during adolescence (tracking with divergence).
+- Stability alone does not prove that clusters exist; the null benchmark was needed to
+  tell a reproducible split from real groups.
+
+![k-means split of level and maturation speed, and growth curves by group](figures/phenotypes.png)
+
 ## Limitations
 - Girls only, from one US city, measured in the 1970s–80s: results may not generalise
   to boys, current populations, or preterm-born children.
 - No information on prematurity, respiratory disease, smoking exposure or environment.
 - Missingness is assumed MAR; MNAR dropout cannot be ruled out.
 - Validation is internal (same cohort); no external cohort was available.
-- Flagging thresholds for "dip-and-recover" visits (0.2 L / 0.3 L) are judgement calls.
+- Flagging thresholds for "dip-and-recover" visits (0.2 L / 0.3 L) and the ≥5-visit
+  threshold for clustering are judgement calls.
+- Clustering used shrunken random-effect estimates, which pull girls towards the centre
+  and can blur real separation.
 
 ## Next steps
-- **Trajectory phenotyping:** cluster girls by their estimated random effects (level and
-  maturation rate) and assess cluster stability (in progress).
+- Latent class trajectory models (e.g. `lcmm` in R), which estimate classes inside the
+  model rather than clustering shrunken estimates.
 - Compare missing-data approaches (complete-case, multiple imputation, mixed model).
 - Compare with flexible ML models (e.g. gradient boosting) and interpret with SHAP.
 - External validation in an independent cohort, and use of GLI reference z-scores.
 - Extension to the questions of the PhD project: trajectories from infancy in
   moderate-to-late preterm children, integrating breath metabolomics, biomarkers and
-  environmental exposures.
+  environmental exposures, where distinct phenotypes are more plausible.
 
 ## Repository structure
 ```
 lung-trajectories/
 ├── data/                 # not tracked: place fev1.dta here
+├── figures/              # figures used in this README
 ├── notebooks/
 │   ├── 01_exploration.ipynb
 │   ├── 02_mixed_effects_model.ipynb
-│   └── 03_validation.ipynb
+│   ├── 03_validation.ipynb
+│   └── 04_phenotypes.ipynb
 ├── src/
 ├── requirements.txt
 └── README.md
@@ -172,4 +210,4 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 Place `fev1.dta` in `data/`, then run the notebooks in order. Notebook 01 creates
-`data/fev1_clean.csv`, which notebooks 02 and 03 use.
+`data/fev1_clean.csv`, which the other notebooks use.
